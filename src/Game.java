@@ -18,6 +18,16 @@ public class Game {
 		}
 	}
 	
+	public Game(Game g){
+		arr = new Sub_Game[3][3];
+		for(int i = 0; i<3; i++){
+			for(int j = 0; j<3; j++){
+				this.arr[i][j]=new Sub_Game(g.arr[i][j]);
+			}
+		}
+		this.won = g.won;
+	}
+	
 	public Game(NEAT_Instance one, NEAT_Instance two){
 		this();
 		neat1=one;

@@ -60,9 +60,19 @@ public class GameDisplay {
 			}
 		});
 		
+		JButton minimax = new JButton("Play Minimax");
+		minimax.setBounds(750,920,1000,100);
+		minimax.setFont(new Font("Century Gothic",Font.PLAIN, 40));
+		minimax.addActionListener(new ActionListener(){
+			public void actionPerformed(ActionEvent arg0) {
+				minimaxGUI();
+			}
+		});
+		
 		Container manage = window.getContentPane();
 		manage.add(enter);
 		manage.add(evolution);
+		manage.add(minimax);
 		
 		window.pack();
 		window.repaint();
@@ -269,6 +279,57 @@ public class GameDisplay {
 		bgThread.execute();
 	}
 	
+	public void minimaxGUI(){
+		clearInterface();
+		Container manage = window.getContentPane();
+		Game game = new Game();
+		Board board = new Board(game, window);
+		PlayerVMinimaxManager pvmm = new PlayerVMinimaxManager(new Minimax(), board, game, 2);
+		SwingWorker bgThread = new SwingWorker<Void, Void>(){
+			@Override
+			public Void doInBackground() throws Exception {
+				pvmm.runDecision();
+				return null;
+			}
+		};
+		JButton reset = new JButton("<html><center>Reset</center><center>Game</center></html>");
+		reset.addActionListener(new ActionListener(){
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+				bgThread.cancel(true);
+				minimaxGUI();
+			}
+		});
+		reset.setBounds(1900,650,200,200);
+		reset.setFont(new Font("Century Gothic",Font.PLAIN, 40));
+		MinimaxProgress mmp = new MinimaxProgress(pvmm.minimax);
+		manage.add(reset);
+		manage.add(mmp);
+		board.addButtons();
+		manage.add(board);
+		KeyboardFocusManager kfm = KeyboardFocusManager.getCurrentKeyboardFocusManager();
+		kfm.addKeyEventDispatcher(new KeyEventDispatcher(){
+			@Override
+			public boolean dispatchKeyEvent(KeyEvent arg0) {
+				if(arg0.getKeyCode()==KeyEvent.VK_ESCAPE){
+					kfm.removeKeyEventDispatcher(this);
+					entryMenu();
+				}
+				return false;
+			}
+		});
+		Timer timer = new Timer(100, new ActionListener(){
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+				mmp.upd();
+			}
+		});
+		timer.start();
+		window.pack();
+		window.repaint();
+		bgThread.execute();
+	}
+	
 	public void clearInterface(){
 		window.getContentPane().removeAll();
 	}
@@ -377,179 +438,37 @@ public class GameDisplay {
 		
 	}
 	
-	public class Board extends JPanel{
+	public class MinimaxProgress extends JComponent{
 		
-		int unit = 150;
-		Game game;
-		JFrame frame;
-		int[][] nine9;
-		int[][] three3;
-		JButton[][] buttons;
-		int turn = 1;
-		boolean playergame = false;
+		public Minimax minimax;
+		public JProgressBar[] bars;
+		public final int MIN_OFFSET = 10;
+		public final int MAX_HEIGHT = 50;
 		
-		public Board(Game g, JFrame f){
-			this.setBounds(75,75,9*unit,9*unit);
-			this.setLayout(null);
-			game = g;
-			frame=f;
-			nine9=new int[9][9];
-			three3=new int[3][3];
-			if(g.neat1==null){
-				playergame = true;
-			}
-		}
-		
-		public void reset(Game g){
-			this.removeAll();
-			game = g;
-			nine9=new int[9][9];
-			three3=new int[3][3];
-			if(g.neat1==null){
-				playergame = true;
+		public MinimaxProgress(Minimax m){
+			this.setBounds(1550, 100, 900, 500);
+			minimax = m;
+			bars = new JProgressBar[minimax.MAX_DEPTH];
+			int offset = 0;
+			int height = 0;
+			if(500 > (MAX_HEIGHT + MIN_OFFSET) * minimax.MAX_DEPTH){
+				height = MAX_HEIGHT;
+				offset = 500/minimax.MAX_DEPTH - height;
 			}else{
-				playergame = false;
+				offset = MIN_OFFSET;
+				height = 500/minimax.MAX_DEPTH - offset;
+			}
+			for(int i = 0; i<minimax.MAX_DEPTH; i++){
+				bars[i] = new JProgressBar(SwingConstants.HORIZONTAL, 0, 100);
+				bars[i].setBounds(0,500/minimax.MAX_DEPTH*i+offset/2,900,height);
+				this.add(bars[i]);
 			}
 		}
 		
-		@Override
-		public void paintComponent(Graphics g){
-			super.paintComponent(g);
-			Graphics2D g2 = (Graphics2D) g;
-			for(int i = 1; i<9;i++){
-				if(i%3==0){
-					g2.setStroke(new BasicStroke(4));
-				}else{
-					g2.setStroke(new BasicStroke(1));
-				}
-				g2.draw(new Line2D.Float(i*unit, 0 , i*unit, 9*unit));
-				g2.draw(new Line2D.Float(0, i*unit, 9*unit, i*unit));
-				
-			}
-		}
-		
-		public void update(){
-			if(game.updated){
-				game.updated = false;
-				for(int  i = 0; i < 3; i++){
-					for(int j = 0; j < 3; j++){
-						for(int k = 0; k < 3; k++){
-							for(int l = 0; l < 3; l++){
-								if(game.arr[i][j].arr[k][l]!=nine9[i*3+k][j*3+l]){
-									switch(game.arr[i][j].arr[k][l]){
-									case 1:
-										this.add(new Square((i*3+k)*unit,(j*3+l)*unit,'x'));
-										break;
-									case 2:
-										this.add(new Square((i*3+k)*unit,(j*3+l)*unit,'o'));
-										break;
-									}
-									
-								}
-							}
-						}
-						if(game.arr[i][j].finished!=three3[i][j]){
-							switch(game.arr[i][j].finished){
-							case 1:
-								this.add(new Square(i*3*unit,j*3*unit,'x',true));
-								break;
-							case 2:
-								this.add(new Square(i*3*unit,j*3*unit,'o',true));
-								break;
-							}
-							if(playergame)removeButtons33(i,j);
-						}
-					}
-				}
-			}
-			if(game.won!=0 && playergame){
-				for(int i = 0; i<3; i++){
-					for(int j = 0; j<3; j++){
-						removeButtons33(i,j);
-					}
-				}
-			}
-			frame.pack();
-			this.repaint();
-		}
-		
-		public void addButtons(){
-			int margin = 10;
-			Board bt = this;
-			buttons = new JButton[9][9];
-			for(int i = 0; i < 9; i++){
-				for(int j = 0; j < 9; j++){
-					final int x = i;
-					final int y = j;
-					JButton b = new JButton();
-					b.setBounds(i*unit+margin,j*unit+margin,unit-2*margin,unit-2*margin);
-					b.addActionListener(new ActionListener(){
-						@Override
-						public void actionPerformed(ActionEvent arg0) {
-							// TODO Auto-generated method stub
-							bt.remove(b);
-							buttons[x][y]=null;
-							game.place(x, y, turn);
-							turn = 3-turn;
-							bt.update();
-						}
-					});
-					this.add(b);
-					buttons[i][j]=b;
-				}
-			}
-		}
-		
-		public void removeButtons33(int x, int y){
-			for(int i = 0; i<3; i++){
-				for(int j = 0; j<3; j++){
-					if(buttons[x*3+i][y*3+j]!=null){
-						this.remove(buttons[x*3+i][y*3+j]);
-						buttons[x*3+i][y*3+j]=null;
-					}
-				}
-			}
-		}
-		
-		public class Square extends JPanel{
-			
-			int unit = 150;
-			int margin = 30;
-			char type = 'n';
-			
-			public Square(int x, int y, char t){
-				this.setBounds(x,y,unit,unit);
-				this.setOpaque(false);
-				type = t;
-			}
-			
-			public Square(int x, int y, char t, boolean big){
-				unit*=3;
-				margin*=2;
-				this.setBounds(x,y,unit,unit);
-				this.setOpaque(false);
-				type = t;
-			}
-			
-			@Override
-			public void paint(Graphics g){
-				super.paintComponent(g);
-				Graphics2D g2 = (Graphics2D) g;
-				int colorvar = 0;
-				if(unit==150){
-					g2.setStroke(new BasicStroke(10));
-				}else{
-					g2.setStroke(new BasicStroke(30));
-					colorvar = 100;
-				}
-				if(type == 'x'){
-					g2.setColor(new Color(colorvar,colorvar,255));
-					g2.draw(new Line2D.Float(margin, margin , unit-margin, unit-margin));
-					g2.draw(new Line2D.Float(margin, unit-margin , unit-margin, margin));
-				}else{
-					g2.setColor(new Color(255,colorvar,colorvar));
-					g2.drawOval(margin, margin, unit-2*margin, unit-2*margin);
-				}
+		public void upd(){
+			if(minimax.completion == null)return;
+			for(int i = 0; i<minimax.completion.length; i++){
+				bars[i].setValue(minimax.completion[i]*100/80);
 			}
 		}
 		

@@ -9,6 +9,16 @@ public class Sub_Game {
 		finished = 0;
 	}
 	
+	public Sub_Game(Sub_Game sg){
+		arr = new int[3][3];
+		for(int i = 0; i<3; i++){
+			for(int j = 0; j<3; j++){
+				this.arr[i][j]=sg.arr[i][j];
+			}
+		}
+		this.finished = sg.finished;
+	}
+	
 	public boolean place(int posx, int posy, int value){
 		if(finished!=0){
 			return false;
