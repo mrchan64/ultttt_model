@@ -72,7 +72,7 @@ public class Board extends JPanel{
 									this.add(new Square((i*3+k)*unit,(j*3+l)*unit,'o'));
 									break;
 								}
-								if(buttons[i*3+k][j*3+l]!=null){
+								if(buttons!=null&&buttons[i*3+k][j*3+l]!=null){
 									this.remove(buttons[i*3+k][j*3+l]);
 									buttons[i*3+k][j*3+l]=null;
 								}
@@ -121,6 +121,7 @@ public class Board extends JPanel{
 						bt.remove(b);
 						buttons[x][y]=null;
 						game.place(x, y, turn);
+						if(playergame)refreshButtons();
 						turn = 3-turn;
 						bt.update();
 					}
@@ -132,6 +133,7 @@ public class Board extends JPanel{
 	}
 	
 	public void removeButtons33(int x, int y){
+		if(buttons==null)return;
 		for(int i = 0; i<3; i++){
 			for(int j = 0; j<3; j++){
 				if(buttons[x*3+i][y*3+j]!=null){
@@ -143,12 +145,28 @@ public class Board extends JPanel{
 	}
 	
 	public void enableButtons(boolean state){
-		for(int i = 0; i< 9; i++){
-			for(int j = 0; j<9; j++){
-				if(buttons[i][j]==null)continue;
-				buttons[i][j].setEnabled(state);
+		if(!state){
+			for(int i = 0; i< 9; i++){
+				for(int j = 0; j<9; j++){
+					if(buttons[i][j]==null)continue;
+					buttons[i][j].setEnabled(false);
+				}
+			}
+		}else{
+			for(int i = 0 ; i<game.available.ret.size(); i++){
+				Position p = game.available.ret.get(i);
+				try{
+					buttons[p.x][p.y].setEnabled(true);
+				}catch(NullPointerException e){
+					System.out.println("Position ["+p.x+", "+p.y+"] threw a NullPointerException when being enabled!");
+				}
 			}
 		}
+	}
+	
+	public void refreshButtons(){
+		enableButtons(false);
+		enableButtons(true);
 	}
 	
 	public class Square extends JPanel{

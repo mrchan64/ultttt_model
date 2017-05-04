@@ -3,15 +3,17 @@ public class Minimax {
 	
 	public Game acting;
 	public int player;
+	public int time=81;
 	
-	public final int MAX_DEPTH = 4;
+	public final int MAX_DEPTH = 6;
 	
-	public final double WIN_WEIGHT = 50;
+	public final int WIN_WEIGHT = 50;
 	public final double SUB_WIN_WEIGHT = 35;
 	public final double TWO_ROW_WEIGHT = 15;
 	public final double OCCUPY_MIDDLE_WEIGHT = 10;
 	
 	public int[] completion;
+	public int[] maxcompletion;
 	
 	private int xpos, ypos;
 	
@@ -21,13 +23,21 @@ public class Minimax {
 	}
 	
 	public void decision(){
+		time--;
 		completion = new int[MAX_DEPTH];
-		examine(MAX_DEPTH, player, acting);
-		acting.place(xpos, ypos, player);
-		System.out.println(xpos+" "+ypos);
+		maxcompletion = new int[MAX_DEPTH];
+		for(int i = 0; i<maxcompletion.length; i++){
+			maxcompletion[i]=1;
+		}
+		long start = System.currentTimeMillis();
+		examine2(MAX_DEPTH, player, acting, Integer.MAX_VALUE/2, Integer.MIN_VALUE/2);
+		boolean valid = acting.place(xpos, ypos, player);
+		double time = (System.currentTimeMillis()-start)/1000.0;
+		System.out.println(xpos+" "+ypos+" "+valid+" "+time+"s");
 	}
 	
 	public double examine(int depth, int player, Game game){
+		
 		if(depth==0){
 			return 0;
 		}
@@ -81,6 +91,48 @@ public class Minimax {
 				if(game.arr[bigX][bigY].arr[testX][testY]==game.arr[bigX][bigY].arr[smallX][smallY]){
 					score+=TWO_ROW_WEIGHT;
 				}
+			}
+		}
+		return score;
+	}
+	
+	public int examine2(int depth, int player, Game game, int alpha, int beta){
+		for(int i = 0; i<MAX_DEPTH-depth; i++){
+			System.out.print("  ");
+		}
+		System.out.println(alpha+ " "+beta);
+		if(game.won!=0)return -time*WIN_WEIGHT;
+		if(depth==0)return -stateScore(game);
+		
+		int max = beta;
+		Position bestMove = null;
+		maxcompletion[depth-1]=game.available.ret.size();
+		for(int i = 0; i<maxcompletion[depth-1]; i++){
+			Position move = game.available.ret.get(i);
+			Game g = new Game(game);
+			if(!g.place(move.x, move.y, player))continue;
+			int score = -examine2(depth-1, 3-player, g, -max, -alpha);
+			if(score >= alpha) return score;
+			if(score > max){
+				max = score;
+				bestMove = move;
+			}
+			completion[depth-1]=i+1;
+		}
+		if(depth == MAX_DEPTH){
+			xpos = bestMove.x;
+			ypos = bestMove.y;
+		}
+		return max;
+	}
+	
+	public int stateScore(Game g){
+		int score = 0;
+		for(int i = 0; i<9; i++){
+			if(g.arr[i/3][i%3].finished==player){
+				score+=time*WIN_WEIGHT/4;
+			}else if(g.arr[i/3][i%3].finished==3-player){
+				score+=time*WIN_WEIGHT/6;
 			}
 		}
 		return score;

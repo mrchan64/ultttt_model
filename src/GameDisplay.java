@@ -69,10 +69,20 @@ public class GameDisplay {
 			}
 		});
 		
+		JButton neural = new JButton("Play Neural Net");
+		neural.setBounds(750,1030,1000,100);
+		neural.setFont(new Font("Century Gothic",Font.PLAIN, 40));
+		neural.addActionListener(new ActionListener(){
+			public void actionPerformed(ActionEvent arg0) {
+				newPvAIGUI(new Game());
+			}
+		});
+		
 		Container manage = window.getContentPane();
 		manage.add(enter);
 		manage.add(evolution);
 		manage.add(minimax);
+		manage.add(neural);
 		
 		window.pack();
 		window.repaint();
@@ -185,7 +195,7 @@ public class GameDisplay {
 			@Override
 			public Void doInBackground() throws Exception {
 				while(true){
-					evo.playGeneration();
+					evo.playGenerationRandom();
 					Thread.sleep(10);
 				}
 			}
@@ -265,7 +275,7 @@ public class GameDisplay {
 				ai1.upd(evo.ai1);
 				genNum.upd(evo.generation);
 				gameNum.upd(evo.set);
-				genPerc.upd(evo.gameNum);
+				genPerc.upd(evo.gameNum, evo.gameMax);
 				if(evo.activeGame!=null){
 					if(evo.activeGame!=current){
 						current = evo.activeGame;
@@ -325,6 +335,46 @@ public class GameDisplay {
 			}
 		});
 		timer.start();
+		window.pack();
+		window.repaint();
+		bgThread.execute();
+	}
+	
+	public void newPvAIGUI(Game g){
+		clearInterface();
+		Container manage = window.getContentPane();
+		Board board = new Board(g, window);
+		PlayerVNeuralNetManager pvnn = new PlayerVNeuralNetManager("genes/net0.g", board, g, 2);
+		SwingWorker bgThread = new SwingWorker<Void, Void>(){
+			@Override
+			public Void doInBackground() throws Exception {
+				pvnn.runDecision();
+				return null;
+			}
+		};
+		JButton reset = new JButton("<html><center>Reset</center><center>Game</center></html>");
+		reset.addActionListener(new ActionListener(){
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+				newPvAIGUI(new Game());
+			}
+		});
+		reset.setBounds(1900,650,200,200);
+		reset.setFont(new Font("Century Gothic",Font.PLAIN, 40));
+		manage.add(reset);
+		board.addButtons();
+		manage.add(board);
+		KeyboardFocusManager kfm = KeyboardFocusManager.getCurrentKeyboardFocusManager();
+		kfm.addKeyEventDispatcher(new KeyEventDispatcher(){
+			@Override
+			public boolean dispatchKeyEvent(KeyEvent arg0) {
+				if(arg0.getKeyCode()==KeyEvent.VK_ESCAPE){
+					kfm.removeKeyEventDispatcher(this);
+					entryMenu();
+				}
+				return false;
+			}
+		});
 		window.pack();
 		window.repaint();
 		bgThread.execute();
@@ -390,8 +440,8 @@ public class GameDisplay {
 			perc+=Integer.toString(percentage)+"%";
 			this.setText(perc);
 		}
-		public void upd(int p){
-			percentage = (int)(((double)p)/((double)(Evolution.popSize*1.5))*100);
+		public void upd(int p, int max){
+			percentage = (int)(((double)p)/((double)(max))*100);
 			upd();
 		}
 	}
@@ -468,7 +518,7 @@ public class GameDisplay {
 		public void upd(){
 			if(minimax.completion == null)return;
 			for(int i = 0; i<minimax.completion.length; i++){
-				bars[i].setValue(minimax.completion[i]*100/80);
+				bars[i].setValue(minimax.completion[i]*100/minimax.maxcompletion[i]);
 			}
 		}
 		

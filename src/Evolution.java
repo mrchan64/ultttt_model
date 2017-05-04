@@ -18,6 +18,7 @@ public class Evolution{
 	public int generation = -1;
 	public int set = -1;
 	public int gameNum = -1;
+	public int gameMax = 150;
 	public int ai1 = -1;
 	public int ai2 = -1;
 	public NEAT_Instance[] neats;
@@ -25,6 +26,7 @@ public class Evolution{
 	public boolean paused = true;
 	public Game activeGame;
 	public GammaDistribution norm=new GammaDistribution(1,1.5);
+	public double randomWinPerc = 0.0;
 	
 	public static void main(String[] args){
 		//need stuff for reading a saved file
@@ -57,13 +59,15 @@ public class Evolution{
 			BufferedWriter wtr = new BufferedWriter(new FileWriter(geneDir+"info.info"));
 			wtr.write(Integer.toString(generation));
 			wtr.close();
+			System.out.println("[*] Total of "+Innovations.length()+" id's written");
 		}catch(Exception e){
-			System.out.println("File writing failed...");
+			System.out.println("[*] File writing failed...");
 		}
 	}
 	
 	public void readGenes(){
 		try{
+			Innovations.reset();
 			for(int i = 0; i<popSize; i++){
 				neats[i]=new NEAT_Instance();
 				neats[i].load_genes(geneDir+"net"+i+".g");
@@ -72,8 +76,9 @@ public class Evolution{
 			StringTokenizer tkn = new StringTokenizer(rdr.readLine());
 			generation = Integer.parseInt(tkn.nextToken());
 			rdr.close();
+			System.out.println("[*] Read a total of "+Innovations.length()+" unique id's");
 		}catch(Exception e){
-			System.out.println("File reading failed...");
+			System.out.println("[*] File reading failed...");
 		}
 	}
 	
@@ -91,6 +96,7 @@ public class Evolution{
 		NEAT_Instance[] set2 = new NEAT_Instance[popSize/4];
 		NEAT_Instance[] set3 = new NEAT_Instance[popSize/4];
 		NEAT_Instance[] set4 = new NEAT_Instance[popSize/4];
+		gameMax = (int)(popSize*1.5);
 		for(int i = 0; i<popSize; i++){
 			if(i<popSize*3/4){
 				if(i<popSize/2){
@@ -197,6 +203,45 @@ public class Evolution{
 		nextGen();
 	}
 	
+	public void playGenerationRandom(){
+		while(paused){
+			try {
+				Thread.sleep(1);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		generation++;
+		gameMax = popSize*4;
+		gameNum = 1;
+		set = 1;
+		int gameswon = 0;
+		RandomPlayer rp = new RandomPlayer();
+		for(int j = 0; j<4; j++){
+			for(int i = 0; i<neats.length; i++){
+				Game g1 = new Game(neats[i],rp);
+				activeGame = g1;
+				ai1 = i;
+				ai2 = -1;
+				g1.playEvolution();
+				if(g1.won==neats[1].player)gameswon++;
+				Game g2 = new Game(rp,neats[i]);
+				activeGame = g2;
+				ai2 = i;
+				ai1 = -1;
+				g2.playEvolution();
+				gameNum++;
+				if(g2.won==neats[1].player)gameswon++;
+			}
+			set++;
+		}
+		randomWinPerc = ((double)gameswon)/((double)gameNum)*100;
+		ai1 = -1;
+		ai2 = -1;
+		nextGen();
+	}
+	
 	public void nextGen(){
 		PriorityQueue<NEAT_Instance> sorting = new PriorityQueue<NEAT_Instance>(popSize,new BestGenes());
 		for(int i = 0; i<neats.length;i++){
@@ -206,12 +251,17 @@ public class Evolution{
 		for(int i = 0; i<popSize; i++){
 			sorted[i] = sorting.poll();
 		}
+		String perc="";
+		if(randomWinPerc>0.1)perc=" [Won: "+randomWinPerc+"%]";
+		System.out.println("[*] Generation "+generation+" data:"+perc);
+		System.out.print("Fitness: \t");
 		for(int i = 0; i<popSize/4; i++){
-			System.out.print(sorted[i].fitness+" ");
+			System.out.print(sorted[i].fitness+" \t");
 		}
 		System.out.println();
+		System.out.print("Num Links: \t");
 		for(int i = 0; i<popSize/4; i++){
-			System.out.print(sorted[i].links.size()+" ");
+			System.out.print(sorted[i].links.size()+" \t");
 		}
 		System.out.println();
 		for(int i = 0; i<popSize; i++){

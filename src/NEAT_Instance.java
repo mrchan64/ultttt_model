@@ -17,23 +17,23 @@ public class NEAT_Instance {
 	public Node[] outputNeurons;
 	public ArrayList<Link> links;
 	public ArrayList<Node> nodes;
-	public BiasNode bias;
+	public Node bias;
 	public NormalDistribution norm=new NormalDistribution(0,.75);
 	
 	public NEAT_Instance(){
 		//There are 9*9*2=162 input nodes and 7 output nodes (coded in binary)
 		inputNeurons = new Node[162];
-		for(int i = 0; i<162; i++){
+		for(int i = 0; i<inputNeurons.length; i++){
 			inputNeurons[i] = new Node();
 		}
-		outputNeurons = new Node[7];
-		for(int i = 0; i<7; i++){
-			outputNeurons[i] = new Node();
+		outputNeurons = new Node[81];
+		for(int i = 0; i<outputNeurons.length; i++){
+			outputNeurons[i] = new Node(true);
 		}
 		fitness = 0;
 		links = new ArrayList<Link>(1);
 		nodes = new ArrayList<Node>(1);
-		bias = new BiasNode(0);
+		bias = new Node();
 	}
 	
 	public void load_game(Game game, int player){
@@ -50,18 +50,18 @@ public class NEAT_Instance {
 			 * Line 1: #of intermediate nodes
 			 * Line 2: #of links
 			 * Line 3->n: Each line is a link (in node, out node)
+			 *            Bias Neuron: "b"
 			 * 			  Output Neurons: "o"
 			 * 			  Input Neurons: "i"
 			 * 			  Between Neurons: "n"
 			 */
-			Innovations.created_IDs = new ArrayList<String>(1);
 			StringTokenizer line = new StringTokenizer(rdr.readLine());
 			int numNodes = Integer.parseInt(line.nextToken());
 			line = new StringTokenizer(rdr.readLine());
 			for(int i = 0; i<numNodes; i++){
 				Node newNode = new Node();
 				newNode.innovation_ID = line.nextToken();
-				Innovations.created_IDs.add(newNode.innovation_ID);
+				Innovations.addExisting(newNode.innovation_ID);
 				nodes.add(newNode);
 			}
 			line = new StringTokenizer(rdr.readLine());
@@ -73,6 +73,9 @@ public class NEAT_Instance {
 				String inNode = line.nextToken();
 				int num = Integer.parseInt(inNode.substring(1, inNode.length()));
 				switch(inNode.substring(0,1)){
+				case "b":
+					in = bias;
+					break;
 				case "o":
 					in = outputNeurons[num];
 					break;
@@ -100,22 +103,17 @@ public class NEAT_Instance {
 				default:
 					System.out.println("Cannot Parse");
 				}
-				String id = line.nextToken();
 				Link a = new Link(in,out);
-				a.innovation_ID = id;
-				Innovations.created_IDs.add(id);
 				a.weight = Double.parseDouble(line.nextToken());
+				String id = line.nextToken();
+				a.innovation_ID = id;
+				Innovations.addExisting(a.innovation_ID);
 				links.add(a);
-			}
-			line = new StringTokenizer(rdr.readLine());
-			bias.bias = Double.parseDouble(line.nextToken());
-			while(line.hasMoreTokens()){
-				bias.connected.add(nodes.get(Integer.parseInt(line.nextToken())));
 			}
 			rdr.close();
 		}catch(Exception e){
-			System.out.println("File "+filename+" not found...");
-			//e.printStackTrace();
+			System.out.println("[*] File "+filename+" not found...");
+			e.printStackTrace();
 		}
 	}
 	
@@ -135,7 +133,9 @@ public class NEAT_Instance {
 				String w = "";
 				int iiind = NEAT_Instance.arrayContains(inputNeurons, l.input);
 				int ioind = NEAT_Instance.arrayContains(outputNeurons, l.input);
-				if(iiind>-1){
+				if(l.input==bias){
+					w+="b"+1;
+				}else if(iiind>-1){
 					w += "i"+iiind;
 				}else if(ioind>-1){
 					w += "o"+ioind;
@@ -158,13 +158,6 @@ public class NEAT_Instance {
 				w += l.innovation_ID;
 				wtr.write(w+"\n");
 			}
-			int[] ind = bias.indices(nodes);
-			String b = Double.toString(bias.bias);
-			for(int i = 0; i<ind.length; i++){
-				b += " "+ind[i];
-			}
-			b+="\n";
-			wtr.write(b);
 			wtr.close();
 		} catch (Exception e) {
 			System.out.println("Writing failed...");
@@ -172,8 +165,6 @@ public class NEAT_Instance {
 	}
 	
 	public void decision(){
-		int xpos=-1;
-		int ypos=-1;
 		
 		/* RESET ALL NODES */
 		for(int i = 0; i<inputNeurons.length;i++){
@@ -197,23 +188,23 @@ public class NEAT_Instance {
 				}
 			}
 		}
-		bias.evaluate();
+		bias.setVal(1);
 		
 		/* READING OUTPUTS */
-		int val = 0;
-		for(int i = 6; i>=0; i--){
-			val += Math.pow(2, i)*outputNeurons[i].activated;
+		Position max = new Position(-1,-1);
+		double highScore = -10000;
+		for(int i = 0; i<acting.available.ret.size();i++){
+			Position temp = acting.available.ret.get(i);
+			double score = outputNeurons[temp.x*9+temp.y].total;
+			if(score>highScore){
+				max = temp;
+				highScore = score;
+			}
 		}
-		if(val>=81){
-			val = 80;
-		}
-		xpos = val%9;
-		ypos = val/9;
 		
-		if(!acting.place(xpos, ypos, player)){
+		if(!acting.place(max.x, max.y, player)){
 			acting.won=3-player;
 		}
-		fitness += 1;
 	}
 	
 	public static NEAT_Instance breed(NEAT_Instance neat1, NEAT_Instance neat2){
@@ -266,7 +257,7 @@ public class NEAT_Instance {
 			a.weight = l.weight;
 			child.links.add(a);
 		}*/
-		
+		try{
 		ArrayList<String> active_IDs = new ArrayList<String>();
 		for(int i = 0; i<neat1.nodes.size();i++){
 			Node newNode = new Node();
@@ -286,7 +277,9 @@ public class NEAT_Instance {
 			Link l = neat1.links.get(i);
 			int in = arrayContains(neat1.inputNeurons,l.input);
 			Node node1;
-			if(in==-1){
+			if(l.input==neat1.bias){
+				node1 = child.bias;
+			}else if(in==-1){
 				int n = active_IDs.indexOf(neat1.links.get(i).input.innovation_ID);
 				node1 = child.nodes.get(n);
 			}else{
@@ -316,7 +309,9 @@ public class NEAT_Instance {
 			}
 			int in = arrayContains(neat2.inputNeurons,l.input);
 			Node node1;
-			if(in==-1){
+			if(l.input==neat2.bias){
+				node1 = child.bias;
+			}else if(in==-1){
 				int n = active_IDs.indexOf(neat2.links.get(i).input.innovation_ID);
 				node1 = child.nodes.get(n);
 			}else{
@@ -336,20 +331,9 @@ public class NEAT_Instance {
 			newLink.weight = l.weight;
 			child.links.add(newLink);
 		}
-		child.bias.bias = neat1.bias.bias/2+neat2.bias.bias/2;
-		String[] ind = neat1.bias.innos();
-		for(int i = 0; i<ind.length; i++){
-			int n = active_IDs.indexOf(ind[i]);
-			if(n>-1){
-				child.bias.addNode(child.nodes.get(n));
-			}
-		}
-		ind = neat2.bias.innos();
-		for(int i = 0; i<ind.length; i++){
-			int n = active_IDs.indexOf(ind[i]);
-			if(n>-1){
-				child.bias.addNode(child.nodes.get(n));
-			}
+		}catch(Exception e){
+			e.printStackTrace();
+			System.exit(0);
 		}
 		child.mutate();
 		return child;
@@ -365,8 +349,11 @@ public class NEAT_Instance {
 			nodes.add(temp.input);
 		}else if(rand<6.0){	//add link
 			Node in;
-			int r1 = (int) (Math.random()*(nodes.size()+inputNeurons.length));
-			if(r1>=inputNeurons.length){
+			int r1 = (int) (Math.random()*(nodes.size()+inputNeurons.length+1));
+			r1--;
+			if(r1 == -1){
+				in = bias;
+			}else if(r1>=inputNeurons.length){
 				r1-=inputNeurons.length;
 				in = nodes.get(r1);
 			}else{
@@ -400,14 +387,6 @@ public class NEAT_Instance {
 			if(links.size()==0)return;
 			int r = (int) (Math.random()*links.size());
 			links.get(r).weight*=norm.sample();
-		}else if(rand<19.0){				//perturb bias
-			bias.bias = norm.sample();
-		}else if(rand<19.5){
-			if(nodes.size()==0)return;
-			Node add = nodes.get((int)(Math.random()*nodes.size()));
-			bias.addNode(add);
-		}else{
-			bias.removeNode();
 		}
 	}
 	

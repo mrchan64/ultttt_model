@@ -5,12 +5,19 @@ public class Node {
 	private ArrayList<Link> inLinks;
 	private ArrayList<Link> outLinks;
 	public int activated=0;
+	public double total = 0;
+	public boolean output = false;
 	public String innovation_ID;
 	public double biasInput = 0;
 	
 	public Node(){
 		inLinks=new ArrayList<Link>(1);
 		outLinks=new ArrayList<Link>(1);
+	}
+	
+	public Node(boolean output){
+		this();
+		this.output = true;
 	}
 	
 	public void addOutLink(Link en){
@@ -34,13 +41,13 @@ public class Node {
 	}
 	
 	public void evaluate(){
-		if(activated == 1)return;
-		double total = biasInput;
+		if(activated == 1 && !output)return;
+		total = biasInput;
 		for(int i = 0; i<inLinks.size();i++){
 			Link temp = inLinks.get(i);
 			total+=((double)temp.input.activated)*temp.weight;
 		}
-		if(total>0){
+		if(total>.5){
 			activated=1;
 			for(int i = 0; i<outLinks.size();i++){
 				outLinks.get(i).output.evaluate();

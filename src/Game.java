@@ -1,3 +1,4 @@
+import java.util.ArrayList;
 
 public class Game {
 	
@@ -8,8 +9,11 @@ public class Game {
 	public boolean updated = false;
 	public static int turnDelay = 0;
 	public boolean paused = false;
+	public AvailableSpaces available;
+	public RandomPlayer rp;
 	
 	public Game(){
+		available = new AvailableSpaces();
 		arr=new Sub_Game[3][3];
 		for(int i = 0; i<3; i++){
 			for(int j = 0; j<3; j++){
@@ -19,12 +23,14 @@ public class Game {
 	}
 	
 	public Game(Game g){
+		available = new AvailableSpaces();
 		arr = new Sub_Game[3][3];
 		for(int i = 0; i<3; i++){
 			for(int j = 0; j<3; j++){
 				this.arr[i][j]=new Sub_Game(g.arr[i][j]);
 			}
 		}
+		available.getSpaces(this, -1, -1);
 		this.won = g.won;
 	}
 	
@@ -36,15 +42,36 @@ public class Game {
 		neat2.load_game(this, 2);
 	}
 	
+	public Game(NEAT_Instance one, RandomPlayer random){
+		this();
+		neat1=one;
+		rp=random;
+		neat1.load_game(this, 1);
+		rp.load_game(this, 2);
+	}
+	
+	public Game(RandomPlayer random, NEAT_Instance two){
+		this();
+		neat2=two;
+		rp=random;
+		neat2.load_game(this, 2);
+		rp.load_game(this, 1);
+	}
+	
 	public boolean place(int posx, int posy, int value){
 		int big_x=posx/3;
 		int big_y=posy/3;
 		int little_x=posx%3;
 		int little_y=posy%3;
-		boolean ret=arr[big_x][big_y].place(little_x, little_y, value);
+		boolean ret=available.checkAvailable(this, posx, posy)&&arr[big_x][big_y].place(little_x, little_y, value);
+		if(ret)available.getSpaces(this, posx, posy);
 		updated = ret;
 		won = checkArr();
 		return ret;
+	}
+	
+	public int getValue(int posx, int posy){
+		return arr[posx/3][posy/3].arr[posx%3][posy%3];
 	}
 	
 	private int checkArr(){
@@ -136,47 +163,50 @@ public class Game {
 	}
 	
 	public void playEvolution(){
-		while(won==0){
+		int turn = 81;
+		while(won==0&&available.ret.size()!=0){
 			while(paused){
 				try {
 					Thread.sleep(1);
 				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+					System.out.println("Sleep Failed");
 				}
 			}
 			try{
 				Thread.sleep(turnDelay);
-				neat1.decision();
+				if(neat1!=null)neat1.decision();
+				else rp.decision();
 				Thread.sleep(turnDelay);
-				if(won!=0)break;
+				if(won!=0||available.ret.size()==0)break;
 				while(paused){
 					Thread.sleep(1);
 				}
-				neat2.decision();
+				if(neat2!=null)neat2.decision();
+				else rp.decision();
+				turn--;
 			}catch(Exception e){
 				e.printStackTrace();
 				System.out.println("Threading Failed");
 			}
 		}
 		if(won==1){
-			neat1.fitness+=50;
-			neat2.fitness-=50;
+			if(neat1!=null)neat1.fitness+=turn;
+			if(neat2!=null)neat2.fitness-=turn;
 		}
 		if(won==2){
-			neat2.fitness+=50;
-			neat1.fitness-=50;
+			if(neat2!=null)neat2.fitness+=turn;
+			if(neat1!=null)neat1.fitness-=turn;
 		}
-		for(int i = 0; i<3; i++){
+		/*for(int i = 0; i<3; i++){
 			for(int j = 0; j<3; j++){
-				if(arr[i][j].finished == neat1.player){
+				if(neat1!=null&&arr[i][j].finished == neat1.player){
 					neat1.fitness+=10;
 				}
-				if(arr[i][j].finished == neat2.player){
+				if(neat2!=null&&arr[i][j].finished == neat2.player){
 					neat2.fitness+=10;
 				}
 			}
-		}
+		}*/
 		while(paused){
 			try {
 				Thread.sleep(1);
